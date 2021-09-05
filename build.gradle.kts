@@ -3,7 +3,6 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "1.5.30"
     application
-    id("com.github.mrsarm.jshell.plugin") version "1.1.0"
 }
 
 group = "com.baidu"
@@ -18,8 +17,8 @@ dependencies {
     implementation("commons-validator:commons-validator:1.7")
     implementation("org.apache.commons:commons-lang3:3.12.0")
     testImplementation(kotlin("test-junit5"))
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.6.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.6.0")
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.2")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.2")
 }
 
 

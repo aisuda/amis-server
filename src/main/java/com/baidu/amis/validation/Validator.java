@@ -6,7 +6,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import javax.script.SimpleBindings;
+
 import com.baidu.amis.util.JSONHelper;
+import com.baidu.amis.util.Script;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -21,35 +24,100 @@ public class Validator {
     /**
      * 根据解析的 JSON 节点来进行校验，需要注意第一个参数必须是表单对应的 amis 配置，如果没有解析出来推荐使用后面的方法
      *
-     * @param amisFormSchema 相关表单的 amis JSON 配置
-     * @param data           数据的 JSON
+     * @param form 相关表单的 amis JSON 配置
+     * @param data 数据的 JSON
      * @return 违反规则的列表，如果列表为空意味着没有违反
      */
-    public static List<ConstraintViolation> validate(JsonNode amisFormSchema, JsonNode data) {
-        JsonNode body = amisFormSchema.get("body");
+    public static List<ConstraintViolation> validate(JsonNode form, JsonNode data) {
+        JsonNode body = form.get("body");
         // 兼容旧版的写法
         if (body == null) {
-            body = amisFormSchema.get("controls");
+            body = form.get("controls");
         }
+        ArrayList<ConstraintViolation> res = new ArrayList<ConstraintViolation>();
 
         if (body == null) {
-            return new ArrayList<ConstraintViolation>();
+            return res;
         }
 
-        // TODO 表单级别校验
+        // 后面需要的数据类型
+        SimpleBindings dataBindings = new SimpleBindings();
+        if (data.isObject()) {
+            // 用于内嵌的 data
+            SimpleBindings dataInnerBindings = new SimpleBindings();
+            Iterator<Map.Entry<String, JsonNode>> it = data.fields();
+            while (it.hasNext()) {
+                Map.Entry<String, JsonNode> entry = it.next();
+                dataBindings.put(entry.getKey(), entry.getValue());
+                dataInnerBindings.put(entry.getKey(), entry.getValue());
+            }
+            dataBindings.put("data", dataInnerBindings);
+
+        }
+
+        // 表单级别校验
+        JsonNode rules = form.get("rules");
+        if (rules.isArray()) {
+            for (JsonNode ruleProps : rules) {
+                JsonNode rule = ruleProps.get("rule");
+                JsonNode message = ruleProps.get("message");
+                if (rule != null && message != null) {
+                    boolean ruleValue = Script.eval(rule.asText(), dataBindings);
+                    if (!ruleValue) {
+                        res.add(new ConstraintViolation("", message.asText()));
+                    }
+                }
+            }
+        }
 
         // 只有一个表单项的情况
         if (body.isObject()) {
-            return validateFormItem(body, data);
+            return validateFormItem(body, data, dataBindings);
         } else if (body.isArray()) {
-            ArrayList<ConstraintViolation> result = new ArrayList<>();
             for (JsonNode formItem : body) {
-                result.addAll(validateFormItem(formItem, data));
+                res.addAll(validateFormItem(formItem, data, dataBindings));
             }
-            return result;
+            return res;
         }
 
-        return new ArrayList<ConstraintViolation>();
+        return res;
+    }
+
+    // 就是多了自动解析 JSON
+    public static List<ConstraintViolation> validate(String amisSchemaStr, String data)
+            throws JsonProcessingException {
+        return validate(JSONHelper.toJSONNode(amisSchemaStr), JSONHelper.toJSONNode(data));
+    }
+
+    /**
+     * 根据 amis schema 和表单名进行自动校验
+     * 和前面比就是多了自动转成 JSON 节点和查找对应的表单 schema
+     *
+     * @param amisSchemaStr amis schema 的字符串
+     * @param formName      表单名
+     * @param data          需要校验的数据
+     * @return 违反规则的列表，如果列表为空意味着没有违反
+     * @throws JsonProcessingException
+     */
+    public static List<ConstraintViolation> validate(String amisSchemaStr, String formName, String data)
+            throws JsonProcessingException {
+        return validate(amisSchemaStr, formName, JSONHelper.toJSONNode(data));
+    }
+
+    public static List<ConstraintViolation> validate(String amisSchemaStr, String formName, JsonNode data)
+            throws JsonProcessingException {
+        JsonNode amisSchema = JSONHelper.findObject(JSONHelper.toJSONNode(amisSchemaStr),
+                (String key, JsonNode node, JsonNode parentNode) -> {
+                    if (key != null && key.equals("name")) {
+                        String type = parentNode.get("type").asText();
+                        if (Objects.equals(type, "form")) {
+                            return node.asText().equals(formName);
+                        }
+                    }
+                    return false;
+                }
+        );
+        return validate(amisSchema, data);
     }
 
     // 如果有用户自定义 message，就用那个
@@ -75,15 +143,53 @@ public class Validator {
      * @param data           数据
      * @return 如果数组非空就代表验证不通过
      */
-    public static List<ConstraintViolation> validateFormItem(JsonNode formItemSchema, JsonNode data) {
+    public static List<ConstraintViolation> validateFormItem(JsonNode formItemSchema, JsonNode data,
+                                                             SimpleBindings dataBindings) {
         JsonNode name = formItemSchema.get("name");
 
         if (name == null) {
             return new ArrayList<ConstraintViolation>();
         }
         JsonNode itemData = data.get(name.asText());
-
         JsonNode validations = formItemSchema.get("validations");
+
+        // 将 requireOn 转成 isRequired
+        JsonNode requireOn = formItemSchema.get("requireOn");
+        if (requireOn != null && !requireOn.asText().isEmpty()) {
+            boolean res = Script.eval(requireOn.asText(), dataBindings);
+            if (res) {
+                // 如果是 null 就新建一个
+                if (validations == null) {
+                    ObjectMapper mapper = new ObjectMapper();
+                    ObjectNode node = mapper.createObjectNode();
+                    node.put("isRequired", true);
+                    validations = node;
+                } else {
+                    ((ObjectNode) validations).put("isRequired", true);
+                }
+            }
+        }
+
+        if (validations == null) {
+            return new ArrayList<ConstraintViolation>();
+        }
+
+        // visibleOn 和 hiddenOn
+        JsonNode visibleOn = formItemSchema.get("visibleOn");
+        if (visibleOn != null && !requireOn.asText().isEmpty()) {
+            boolean res = Script.eval(visibleOn.asText(), dataBindings);
+            if (!res) {
+                return new ArrayList<ConstraintViolation>();
+            }
+        }
+        JsonNode hiddenOn = formItemSchema.get("hiddenOn");
+        if (hiddenOn != null && !hiddenOn.asText().isEmpty()) {
+            boolean res = Script.eval(hiddenOn.asText(), dataBindings);
+            if (res) {
+                return new ArrayList<ConstraintViolation>();
+            }
+        }
+
         JsonNodeType validationsNodeType = validations.getNodeType();
         // 将老 string 写法转成新的对象方式
         if (validationsNodeType == JsonNodeType.STRING) {
@@ -102,7 +208,7 @@ public class Validator {
         }
 
         if (validations != null && validations.isObject()) {
-            // TODO 处理 requireOn
+
             // required 转成 isRequired 校验
             JsonNode required = validations.get("required");
             if (required != null && required.asBoolean()) {
@@ -119,7 +225,6 @@ public class Validator {
                 return new ArrayList<ConstraintViolation>();
             }
 
-            // TODO 处理 visibleOn disabledOn 和 hiddenOn
             ArrayList<ConstraintViolation> violationResult = new ArrayList<ConstraintViolation>();
             Iterator<Map.Entry<String, JsonNode>> it = validations.fields();
             while (it.hasNext()) {
@@ -297,37 +402,6 @@ public class Validator {
             return violationResult;
         }
         return new ArrayList<ConstraintViolation>();
-    }
-
-    /**
-     * 根据 amis schema 和表单名进行自动校验
-     * 和前面比就是多了自动转成 JSON 节点和查找对应的表单 schema
-     *
-     * @param amisSchemaStr amis schema 的字符串
-     * @param formName      表单名
-     * @param data          需要校验的数据
-     * @return 违反规则的列表，如果列表为空意味着没有违反
-     * @throws JsonProcessingException
-     */
-    public static List<ConstraintViolation> validate(String amisSchemaStr, String formName, String data)
-            throws JsonProcessingException {
-        return validate(amisSchemaStr, formName, JSONHelper.toJSONNode(data));
-    }
-
-    public static List<ConstraintViolation> validate(String amisSchemaStr, String formName, JsonNode data)
-            throws JsonProcessingException {
-        JsonNode amisSchema = JSONHelper.findObject(JSONHelper.toJSONNode(amisSchemaStr),
-                (String key, JsonNode node, JsonNode parentNode) -> {
-                    if (key != null && key.equals("name")) {
-                        String type = parentNode.get("type").asText();
-                        if (Objects.equals(type, "form")) {
-                            return node.asText().equals(formName);
-                        }
-                    }
-                    return false;
-                }
-        );
-        return validate(amisSchema, data);
     }
 
 }
