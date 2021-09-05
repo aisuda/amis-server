@@ -57,7 +57,7 @@ public class Validator {
 
         // 表单级别校验
         JsonNode rules = form.get("rules");
-        if (rules.isArray()) {
+        if (rules != null && rules.isArray()) {
             for (JsonNode ruleProps : rules) {
                 JsonNode rule = ruleProps.get("rule");
                 JsonNode message = ruleProps.get("message");

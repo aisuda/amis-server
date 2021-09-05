@@ -1,6 +1,6 @@
 package com.baidu.amis.validation
 
-import kotlin.test.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 internal class ValidatorTest {

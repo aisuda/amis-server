@@ -16,9 +16,7 @@ dependencies {
     implementation("com.fasterxml.jackson.core:jackson-databind:2.12.5")
     implementation("commons-validator:commons-validator:1.7")
     implementation("org.apache.commons:commons-lang3:3.12.0")
-    testImplementation(kotlin("test-junit5"))
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.7.2")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.7.2")
+    testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:1.5.21")
 }
 
 

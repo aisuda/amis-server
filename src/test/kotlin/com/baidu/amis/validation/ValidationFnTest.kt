@@ -2,7 +2,7 @@ package com.baidu.amis.validation;
 
 import com.fasterxml.jackson.databind.node.NullNode
 import com.fasterxml.jackson.databind.node.TextNode
-import kotlin.test.Test
+import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 
 internal class ValidationFnTest {
