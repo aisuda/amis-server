@@ -309,7 +309,7 @@ public class ValidationFn {
      * 不是空白字符串
      */
     static boolean notEmptyString(JsonNode value) {
-        return value != null && StringUtils.isBlank(value.asText());
+        return value != null && !value.asText().isEmpty() && StringUtils.isBlank(value.asText());
     }
 
     /**

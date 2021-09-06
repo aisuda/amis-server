@@ -53,6 +53,12 @@ List<ConstraintViolation> violations=Validator.validate("""
 
 因为需要构造大量 JSON 进行测试，而 Java 在 15 之前不支持多行字符串，构造起来麻烦，所以测试的代码是基于 kotlin，可以直接在 IDE 里运行单个测试，或者使用下面的命令运行所有测试：
 
-```
+```shell
 ./gradlew check
+```
+
+生成测试报告
+
+```shell
+./gradlew clean build
 ```

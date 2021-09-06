@@ -25,10 +25,10 @@ public class ViolationMessage {
     static final String isZipcode = "请输入合法的邮编地址";
     static final String isExisty = "不存在这个值";
     static final String lt = "请输入小于 $1 的值";
-    static final String matchRegexp = "格式不正确, 请输入符合规则为 $1 的内容。";
+    static final String matchRegexp = "格式不正确, 请输入符合规则为 $1 的内容";
     static final String maximum = "当前输入值超出最大值 $1";
     static final String maxLength = "请控制内容长度, 不要输入 $1 个以上字符";
     static final String minimum = "当前输入值低于最小值 $1";
-    static final String minLength = "请输入更多的内容，至少输入 $1 个字符。";
+    static final String minLength = "请输入更多的内容，至少输入 $1 个字符";
     static final String notEmptyString = "请不要全输入空白字符";
 }

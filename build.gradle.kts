@@ -3,6 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm") version "1.5.30"
     application
+    jacoco
 }
 
 group = "com.baidu"
@@ -19,9 +20,22 @@ dependencies {
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit5:1.5.21")
 }
 
+jacoco {
+    toolVersion = "0.8.7"
+}
 
 tasks.test {
     useJUnitPlatform()
+    finalizedBy(tasks.jacocoTestReport)
+}
+
+tasks.jacocoTestReport {
+    dependsOn(tasks.test) // tests are required to run before generating the report
+    reports {
+        xml.required.set(false)
+        csv.required.set(false)
+        html.outputLocation.set(layout.buildDirectory.dir("jacocoHtml"))
+    }
 }
 
 tasks.withType<KotlinCompile>() {
