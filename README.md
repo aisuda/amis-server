@@ -41,8 +41,8 @@ List<ConstraintViolation> violations=Validator.validate("""
 }
 """);
 
-        // violations 的结果应该是
-        violations[0].getMessage()=="同学，请输入数字哈"
+// 如果 violations 的结果应该是
+violations[0].getMessage()=="同学，请输入数字哈"
 ```
 
 ## 开发
